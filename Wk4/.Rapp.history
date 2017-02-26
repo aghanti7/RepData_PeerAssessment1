@@ -1,0 +1,11 @@
+load("/Users/ghanti/Desktop/Coursera/Data Science Specialization - Johns Hopkins Univ/Course 05 - Reproducible Research/Assignments/Wk4/stormData.rds")
+list()
+list.files
+list.files()
+sd
+env
+env()
+list()
+load("/Users/ghanti/Desktop/Coursera/Data Science Specialization - Johns Hopkins Univ/Course 05 - Reproducible Research/Assignments/Wk4/stormData.rds")
+ls()
+str(stormData)

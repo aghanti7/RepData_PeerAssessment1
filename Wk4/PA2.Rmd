@@ -1,0 +1,159 @@
+---
+title: "Severe Weather Events In The United States That Have Maximum Impact On The Economy And Public Health"
+author: "Ajay Ghanti"
+date: "10 September 2016"
+output: html_document
+---
+***
+##Synopsis
+
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+The goal of this analysis, and our finding is as follows:
+
+1. Across the United States, which types of events are most harmful with respect to population health?
+    * Tornadoes are by far the most dangerous, consuming thousands of lives, and injuring ten times more number of people
+2. Across the United States, which types of events have the greatest economic consequences?
+    * Floods, hurricanes, tornadoes, and storms cause the maximum property damage, amounting to hundreds of billions of USD
+    * Droughts, floods, and ice storms are responsible for the most crop damage, amounting to tens of billions of USD
+
+***
+##Data Processing
+
+The data for this analysis comes in the form of a comma-separated-value file compressed via the bzip2 algorithm to reduce its size. It is available at: [Storm Data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2) [47Mb]
+
+There is also some documentation of the database available. Here you will find how some of the variables are constructed/defined.
+
+* National Weather Service [Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
+* National Climatic Data Center Storm Events [FAQ](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf)
+
+The events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
+
+The preprocessing that we do on this data involves the following steps:
+
+1. Load the required libraries
+```{r loadLibs}
+library(data.table)
+library(ggplot2)
+library(gridExtra)
+library(car)
+```
+
+2. Read in the Storm Data csv.bz2 file (this will take a couple of minutes the first time; we've cached it for subsequent runs)
+3. Transformations:
+    a. Convert Event Type (EVTYPE) to a factor
+    b. Convert the property and crop damage exponents (PROPDMGEXP and CROPDMGEXP), represented as single characters to numeric exponents; the exponents have the following equivalent numeric values
+        i. [hH] = 10^2
+        ii. [kK] = 10^3
+        iii. [mM] = 10^6
+        iv. [bB] = 10^9
+        v. [digit] = 10^(digit)
+```{r preProcess, cache=TRUE}
+#read in the storm data - this will take a couple of minutes
+stormData <- read.csv("repdata-data-StormData.csv.bz2", as.is = TRUE)
+
+#convert event type to factor
+stormData$EVTYPE <- as.factor(stormData$EVTYPE)
+
+#recode PROPDMGEXP and CROPDMGEXP to numeric exponents
+stormData$PROPDMGEXP <- recode(stormData$PROPDMGEXP, "''=1; '-'=1; '?'=1; '+'=1; '0'=1; '1'=10; '2'=1e2; 'h'=1e2; 'H'=1e2; '3'=1e3; 'K'=1e3; 'k'=1e3; '4'=1e4; '5'=1e5; '6'=1e6; 'M'=1e6; 'm'=1e6; '7'=1e7; '8'=1e8; 'B'=1e9; 'b'=1e9")
+stormData$CROPDMGEXP <- recode(stormData$CROPDMGEXP, "''=1; '-'=1; '?'=1; '+'=1; '0'=1; '1'=10; '2'=1e2; 'h'=1e2; 'H'=1e2; '3'=1e3; 'K'=1e3; 'k'=1e3; '4'=1e4; '5'=1e5; '6'=1e6; 'M'=1e6; 'm'=1e6; '7'=1e7; '8'=1e8; 'B'=1e9; 'b'=1e9")
+```
+
+***
+###Analysis 1: Across the United States, which types of events are most harmful with respect to population health?
+
+1. First aggregate the sum of all fatalities grouped by event type
+2. Then get the top 10 severe weather events that caused the highest fatalities
+3. Similarly, do #1 and #2 to get the list of top 10 severe weather events that caused the highest injuries
+```{r Q1}
+#get sum of fatalities for different events across the US
+sumFat <- aggregate(FATALITIES ~ EVTYPE, stormData, sum)
+#get top 10 events that led to maximum fatalities
+topFat <- sumFat[head(order(-sumFat$FATALITIES), 10), ]
+
+#get sum of injuries for different events across the US
+sumInj <- aggregate(INJURIES ~ EVTYPE, stormData, sum)
+#get top 10 events that led to maximum injuries
+topInj <- sumInj[head(order(-sumInj$INJURIES), 10), ]
+```
+
+***
+###Analysis 2: Across the United States, which types of events have the greatest economic consequences?
+
+1. First aggregate the sum total of all property damage (in USD; after multiplying property damage with the numeric exponent), grouped by event type
+2. Then get the top 10 severe weather events that caused the maximum property damage
+3. Similarly, do #1 and #2 to get the list of top 10 severe weather events that caused the maximum crop damage
+```{r Q2}
+#get sum of property damages (in USD) for different events across the US
+sumProp <- aggregate(PROPDMG*PROPDMGEXP ~ EVTYPE, stormData, sum)
+names(sumProp)[2] = "PROPDMG"
+#get top 10 events that led to maximum property damage
+topProp <- sumProp[head(order(-sumProp$PROPDMG), 10), ]
+names(topProp)[2] = "PROPDMG"
+#convert to billions of USD
+topProp$PROPDMG <- topProp$PROPDMG / 1e9
+
+#get sum of crop damages (in USD) for different events across the US
+sumCrop <- aggregate(CROPDMG*CROPDMGEXP ~ EVTYPE, stormData, sum)
+names(sumProp)[2] = "CROPDMG"
+#get top 10 events that led to maximum crop damage
+topCrop <- sumCrop[head(order(-sumCrop$CROPDMG), 10), ]
+names(topCrop)[2] = "CROPDMG"
+#convert to billions of USD
+topCrop$CROPDMG <- topCrop$CROPDMG / 1e9
+```
+
+***
+##Results
+###1. The top 10 severe weather events vs. the number of fatalities/injuries they caused
+```{r plot1}
+gFat <- ggplot(topFat, aes(reorder(EVTYPE, -FATALITIES), FATALITIES)) +
+    geom_bar(stat="identity") +
+    xlab("Weather Events") +
+    ylab("Fatalities") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+gInj <- ggplot(topInj, aes(reorder(EVTYPE, -INJURIES), INJURIES)) +
+    geom_bar(stat="identity") +
+    xlab("Weather Events") +
+    ylab("Injuries") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+grid.arrange(gFat, gInj, ncol=2)
+```
+
+<strong><em>
+From the above plot, it can be seen that Tornadoes are by far the most dangerous, consuming thousands of lives, and injuring ten times more number of people.
+</em></strong>
+
+###2. The top 10 severe weather events vs. the total amount of property/crop damage they caused (in billions of USD)
+```{r plot2}
+gProp <- ggplot(topProp, aes(reorder(EVTYPE, -PROPDMG), PROPDMG)) +
+    geom_bar(stat="identity") +
+    xlab("Weather Events") +
+    ylab("Property Damage (in billions of USD)") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+gCrop <- ggplot(topCrop, aes(reorder(EVTYPE, -CROPDMG), CROPDMG)) +
+    geom_bar(stat="identity") +
+    xlab("Weather Events") +
+    ylab("Crop Damage (in billions of USD)") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+grid.arrange(gProp, gCrop, ncol=2)
+```
+
+<strong><em>
+From the above plot, we can observe the following:
+
+* Floods, hurricanes, tornadoes, and storms cause the maximum property damage, amounting to hundreds of billions of USD
+* Droughts, floods, and ice storms are responsible for the most crop damage, amounting to tens of billions of USD
+</em></strong>
+
+***
+####Cleanup
+```{r cleanup}
+rm(sumFat, sumInj, topFat, topInj, gFat, gInj)
+rm(sumProp, sumCrop, topProp, topCrop, gProp, gCrop)
+```
+
+***
